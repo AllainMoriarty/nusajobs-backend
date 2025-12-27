@@ -1,0 +1,26 @@
+--extra-index-url https://download.pytorch.org/whl/cu130
+
+fastapi
+uvicorn[standard]
+sqlalchemy
+psycopg2-binary
+python-jose[cryptography]
+pydantic
+pydantic-settings
+python-multipart
+pydantic-extra-types
+alembic
+boto3
+sentence-transformers
+huggingface-hub
+pgvector
+torch
+transformers
+tokenizers
+langchain
+langchain-community
+pypdf
+PyPDF2
+python-magic
+pillow
+openai

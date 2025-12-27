@@ -1,0 +1,15 @@
+from pydantic import BaseModel
+from typing import Optional
+from datetime import datetime
+from uuid import UUID
+
+class CandidateCVResponse(BaseModel):
+    id: UUID
+    candidate_id: UUID
+    file_url: str
+    ocr_text: Optional[str]
+    llm_summary: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
