@@ -55,10 +55,14 @@ class JobApplicationService:
             .all()
         )
 
-    def get_applications_for_job(self, db: Session, job_id: UUID, skip: int = 0, limit: int = 10):
+    def get_applications_for_job(self, db: Session, job_id: UUID, current_user: dict, skip: int = 0, limit: int = 10):
         job = db.query(Job).filter(Job.id == job_id).first()
         if not job:
             raise JobApplicationNotFoundError("Job not found")
+        
+        recruiter = db.query(Recruiter).filter(Recruiter.user_id == current_user["id"]).first()
+        if not recruiter or recruiter.company_id != job.company_id:
+            raise JobApplicationPermissionError("Cannot see application for job outside your company")
 
         return (
             db.query(JobApplication)

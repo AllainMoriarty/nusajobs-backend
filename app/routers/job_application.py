@@ -53,9 +53,11 @@ def get_applications_for_job(job_id: UUID, skip: int = 0, limit: int = 10, curre
     - Admins can view all (future: add company validation for admin too if needed).
     """
     try:
-        return application_service.get_applications_for_job(db, job_id, skip, limit)
+        return application_service.get_applications_for_job(db, job_id, current_user, skip, limit)
     except JobApplicationNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except JobApplicationPermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to retrieve applications")
 
@@ -103,8 +105,6 @@ def update_application_status(application_id: UUID, update: JobApplicationUpdate
 @router.delete("/{application_id}")
 def delete_application(application_id: UUID, current_user: dict = Depends(require_role(["candidate"])), db: Session = Depends(get_db)):
     """
-    Withdraw a job application.
-    
     Only the candidate who submitted the application can delete it.
     """
     try:
