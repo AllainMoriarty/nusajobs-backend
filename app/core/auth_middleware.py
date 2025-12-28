@@ -5,6 +5,7 @@ from app.models.user import User
 from app.models.user_role import SysUserRole
 from app.models.role import SysRole
 from app.core.database import SessionLocal
+from typing import List
 
 async def get_current_user(request: Request):
     auth_header = request.headers.get("Authorization")
@@ -48,3 +49,11 @@ async def get_current_user(request: Request):
 
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
+    
+def require_role(required_roles: List[str]):
+    async def role_checker(current_user: dict = Depends(get_current_user)):
+        user_role = current_user.get("role")
+        if not user_role or user_role not in required_roles:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        return current_user
+    return role_checker
