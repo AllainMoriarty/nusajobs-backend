@@ -1,11 +1,10 @@
 import boto3
 from botocore.exceptions import ClientError
-from typing import Optional
+from typing import Optional, List
 from app.core.config import settings
 
 class S3Service:
     def __init__(self):
-        # Setup S3 client
         self.s3_client = boto3.client(
             's3',
             aws_access_key_id=settings.S3_ACCESS_KEY_ID,
@@ -13,24 +12,29 @@ class S3Service:
             region_name=settings.S3_REGION,
             endpoint_url=settings.S3_ENDPOINT_URL,
         )
-        self.endpoint_url = settings.S3_ENDPOINT_URL
         self.bucket_name = settings.S3_BUCKET_NAME
+        self.gateway_url = "https://gradual-chocolate-cephalopod.myfilebase.com/ipfs"
 
     def upload_file(self, file_data: bytes, filename: str, content_type: str = "application/octet-stream") -> Optional[str]:
         """
-        Upload file to S3
-        Returns: URL of uploaded file or None if failed
+        Upload file ke Filebase dan kembalikan URL IPFS Gateway
         """
         try:
-            self.s3_client.put_object(
+            response = self.s3_client.put_object(
                 Bucket=self.bucket_name,
                 Key=filename,
                 Body=file_data,
                 ContentType=content_type
             )
-            # Return the file URL
-            file_url = f"{self.endpoint_url.rstrip('/')}/{self.bucket_name}/{filename}"
-            return file_url
+            
+            # Filebase mengembalikan CID di dalam header metadata
+            cid = response.get('ResponseMetadata', {}).get('HTTPHeaders', {}).get('x-amz-meta-cid')
+            
+            if cid:
+                # Mengembalikan URL dengan format Gateway
+                return f"{self.gateway_url}/{cid}"
+            
+            return None
         except ClientError as e:
             print(f"Error uploading to S3: {e}")
             return None
@@ -65,20 +69,59 @@ class S3Service:
             print(f"Error checking file existence: {e}")
             return False
 
-    def get_file_url(self, filename: str, expires_in: int = 3600) -> Optional[str]:
+    def get_file_url(self, filename: str) -> Optional[str]:
         """
-        Generate a presigned URL for file access
-        expires_in: URL expiration time in seconds (default: 1 hour)
+        Mendapatkan URL Gateway berdasarkan CID file yang sudah ada
         """
         try:
-            presigned_url = self.s3_client.generate_presigned_url(
-                'get_object',
-                Params={'Bucket': self.bucket_name, 'Key': filename},
-                ExpiresIn=expires_in
-            )
-            return presigned_url
-        except ClientError as e:
-            print(f"Error generating presigned URL: {e}")
+            # Mengambil metadata file untuk mendapatkan CID
+            response = self.s3_client.head_object(Bucket=self.bucket_name, Key=filename)
+            cid = response.get('Metadata', {}).get('cid') or response.get('ResponseMetadata', {}).get('HTTPHeaders', {}).get('x-amz-meta-cid')
+            
+            if cid:
+                return f"{self.gateway_url}/{cid}"
             return None
+        except ClientError as e:
+            print(f"Error fetching CID: {e}")
+            return None
+
+    def list_files_by_prefix(self, prefix: str) -> List[str]:
+        """
+        List semua file dengan prefix tertentu
+        Returns: List of S3 keys
+        """
+        try:
+            response = self.s3_client.list_objects_v2(
+                Bucket=self.bucket_name,
+                Prefix=prefix
+            )
+            
+            if 'Contents' not in response:
+                return []
+            
+            return [obj['Key'] for obj in response['Contents']]
+        except ClientError as e:
+            print(f"Error listing files: {e}")
+            return []
+
+    def delete_files_by_prefix(self, prefix: str) -> bool:
+        """
+        Delete semua file dengan prefix tertentu
+        Returns: True if success, False if failed
+        """
+        try:
+            files = self.list_files_by_prefix(prefix)
+            
+            if not files:
+                return True
+            
+            # Delete objects satu per satu
+            for file_key in files:
+                self.delete_file(file_key)
+            
+            return True
+        except ClientError as e:
+            print(f"Error deleting files by prefix: {e}")
+            return False
 
 s3_service = S3Service()

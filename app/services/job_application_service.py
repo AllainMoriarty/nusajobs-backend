@@ -2,102 +2,99 @@ from sqlalchemy.orm import Session
 from app.models.job_application import JobApplication
 from app.models.candidate_cv import CandidateCV
 from app.models.job import Job
+from app.models.recruiter import Recruiter
 from app.schemas.job_application import JobApplicationCreate, JobApplicationUpdate
 from uuid import UUID
+from app.core.exceptions import JobApplicationNotFoundError, JobApplicationAlreadyExistsError, CVNotFoundError, JobApplicationPermissionError
 
-def create_job_application(db: Session, application_data: JobApplicationCreate, current_user: dict = None):
-    if current_user["role"] != "candidate":
-        raise Exception("Only candidates can apply for jobs")
-    
-    existing_application = db.query(JobApplication).filter(
-        JobApplication.job_id == application_data.job_id,
-        JobApplication.candidate_id == current_user["id"]
-    ).first()
-    
-    if existing_application:
-        raise Exception("Candidate already applied to this job")
-    
-    cv = db.query(CandidateCV).filter(
-        CandidateCV.id == application_data.cv_id,
-        CandidateCV.candidate_id == current_user["id"]
-    ).first()
-    
-    if not cv:
-        raise Exception("CV not found or doesn't belong to candidate")
 
-    db_application = JobApplication(
-        job_id=application_data.job_id,
-        candidate_id=current_user["id"],
-        cv_id=application_data.cv_id
-    )
-    db.add(db_application)
-    db.commit()
-    db.refresh(db_application)
-    return db_application
+class JobApplicationService:
+    def create_application(self, db: Session, application_data: JobApplicationCreate, candidate_id: UUID):
+        existing = db.query(JobApplication).filter(JobApplication.job_id == application_data.job_id,JobApplication.candidate_id == candidate_id).first()
+        if existing:
+            raise JobApplicationAlreadyExistsError("Candidate already applied to this job")
 
-def get_application_by_id(db: Session, application_id: str):
-    return db.query(JobApplication).filter(JobApplication.id == application_id).first()
+        cv = db.query(CandidateCV).filter(CandidateCV.id == application_data.cv_id,CandidateCV.candidate_id == candidate_id).first()
+        if not cv:
+            raise CVNotFoundError("CV not found or doesn't belong to candidate")
 
-def get_applications_by_candidate(db: Session, current_user: dict, skip: int = 0, limit: int = 10):
-    return (
-        db.query(JobApplication)
-        .filter(JobApplication.candidate_id == current_user["id"])
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+        db_application = JobApplication(
+            job_id=application_data.job_id,
+            candidate_id=candidate_id,
+            cv_id=application_data.cv_id
+        )
+        db.add(db_application)
+        db.commit()
+        db.refresh(db_application)
+        return db_application
 
-def get_applications_by_job(db: Session, job_id: str, skip: int = 0, limit: int = 10):
-    return (
-        db.query(JobApplication)
-        .filter(JobApplication.job_id == job_id)
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+    def get_application_by_id(self, db: Session, application_id: UUID, current_user: dict):
+        app = db.query(JobApplication).filter(JobApplication.id == application_id).first()
+        if not app:
+            raise JobApplicationNotFoundError("Job application not found")
+        
+        if current_user["role"] == "candidate" and app.candidate_id != current_user["id"]:
+            raise JobApplicationPermissionError("Not authorized to view this application")
+        
+        if current_user["role"] == "recruiter":
+            job = db.query(Job).filter(Job.id == app.job_id).first()
+            if not job:
+                raise JobApplicationNotFoundError("Associated job not found")
+            recruiter = db.query(Recruiter).filter(Recruiter.user_id == current_user["id"]).first()
+            if not recruiter or recruiter.company_id != job.company_id:
+                raise JobApplicationPermissionError("Not authorized to view this application")
 
-def get_application_by_job_and_candidate(db: Session, job_id: str, candidate_id: str):
-    return db.query(JobApplication).filter(
-        JobApplication.job_id == job_id,
-        JobApplication.candidate_id == candidate_id
-    ).first()
+        return app
 
-def update_application_status(db: Session, application_id: str, status: str, current_user: dict):
-    db_application = db.query(JobApplication).filter(JobApplication.id == application_id).first()
-    if not db_application:
-        return None
+    def get_my_applications(self, db: Session, candidate_id: UUID, skip: int = 0, limit: int = 10):
+        return (
+            db.query(JobApplication)
+            .filter(JobApplication.candidate_id == candidate_id)
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
 
-    if current_user["role"] not in ["recruiter"]:
-        raise Exception("Only recruiter can update application status")
+    def get_applications_for_job(self, db: Session, job_id: UUID, skip: int = 0, limit: int = 10):
+        job = db.query(Job).filter(Job.id == job_id).first()
+        if not job:
+            raise JobApplicationNotFoundError("Job not found")
 
-    job = db.query(Job).filter(Job.id == db_application.job_id).first()
+        return (
+            db.query(JobApplication)
+            .filter(JobApplication.job_id == job_id)
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
 
-    if current_user["role"] == "recruiter":
-        from app.models.recruiter import Recruiter
-        recruiter = db.query(Recruiter).filter(Recruiter.user_id == current_user["id"]).first()
-        if not recruiter:
-            raise Exception("Recruiter not assigned to company")
+    def update_application_status(self, db: Session, application_id: UUID, status: str, user_id: UUID):
+        app = db.query(JobApplication).filter(JobApplication.id == application_id).first()
+        if not app:
+            raise JobApplicationNotFoundError("Job application not found")
 
-    if str(job.company_id) != current_user["id"]:
-        raise Exception("Cannot update application for job outside your company")
+        # Validasi: recruiter hanya boleh update job dari perusahaannya
+        job = db.query(Job).filter(Job.id == app.job_id).first()
+        if not job:
+            raise JobApplicationNotFoundError("Associated job not found")
 
-    db_application.status = status
-    db.commit()
-    db.refresh(db_application)
-    return db_application
+        recruiter = db.query(Recruiter).filter(Recruiter.user_id == user_id).first()
+        if not recruiter or recruiter.company_id != job.company_id:
+            raise JobApplicationPermissionError("Cannot update application for job outside your company")
 
-def delete_application(db: Session, application_id: str, current_user: dict):
-    if current_user["role"] != "candidate":
-        raise Exception("Only candidates can delete their applications")
+        app.status = status
+        db.commit()
+        db.refresh(app)
+        return app
 
-    db_application = db.query(JobApplication).filter(
-        JobApplication.id == application_id,
-        JobApplication.candidate_id == current_user["id"]
-    ).first()
-    
-    if not db_application:
-        return False
+    def delete_my_application(self, db: Session, application_id: UUID, candidate_id: UUID):
+        app = db.query(JobApplication).filter(
+            JobApplication.id == application_id,
+            JobApplication.candidate_id == candidate_id
+        ).first()
+        if not app:
+            raise JobApplicationNotFoundError("Job application not found or not owned by you")
 
-    db.delete(db_application)
-    db.commit()
-    return True
+        db.delete(app)
+        db.commit()
+        return True

@@ -1,55 +1,137 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.services.candidate_cv_service import upload_cv_file, get_cv_by_id, get_cvs_by_candidate, delete_cv
+from app.services.candidate_cv_service import CandidateCVService
 from app.schemas.candidate_cv import CandidateCVResponse
-from app.core.auth_middleware import get_current_user
+from app.core.auth_middleware import require_role
+from app.core.exceptions import CVNotFoundError, CVUploadError, CVDownloadError
+from uuid import UUID
 
 router = APIRouter(prefix="/candidate-cvs", tags=["Candidate CVs"])
+cv_service = CandidateCVService()
+
 
 @router.post("/", response_model=CandidateCVResponse, status_code=status.HTTP_201_CREATED)
-async def upload_cv(file: UploadFile = File(...), current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user["role"] != "candidate":
-        raise HTTPException(status_code=403, detail="Only candidates can upload CVs")
-
+async def upload_cv(
+    file: UploadFile = File(...), 
+    current_user: dict = Depends(require_role(["candidate"])), 
+    db: Session = Depends(get_db)
+):
+    """
+    Upload CV baru (hanya untuk kandidat yang belum pernah upload CV).
+    
+    Jika sudah pernah upload CV, gunakan endpoint PUT untuk update.
+    
+    The system will:
+    - Store the file in cloud storage (S3/IPFS)
+    - Extract text using OCR
+    - Generate a summary using LLM
+    - Create an embedding for matching
+    
+    Only PDF files are allowed.
+    """
     if not file.filename.lower().endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")
 
     file_data = await file.read()
+    if len(file_data) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
 
     try:
-        cv_record = await upload_cv_file(db, file_data, file.filename, current_user["id"])
-        return cv_record
+        return await cv_service.upload_cv(db, file_data, file.filename, current_user["id"])
+    except CVUploadError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to process CV: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
-@router.get("/", response_model=list[CandidateCVResponse])
-def list_my_cvs(skip: int = 0, limit: int = 10, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user["role"] != "candidate":
-        raise HTTPException(status_code=403, detail="Only candidates can access their CVs")
 
-    cvs = get_cvs_by_candidate(db, current_user["id"], skip, limit)
-    return cvs
+@router.put("/", response_model=CandidateCVResponse, status_code=status.HTTP_200_OK)
+async def update_cv(
+    file: UploadFile = File(...), 
+    current_user: dict = Depends(require_role(["candidate"])), 
+    db: Session = Depends(get_db)
+):
+    """
+    Update CV yang sudah ada (replace file lama dengan file baru).
+    
+    Jika belum pernah upload CV, gunakan endpoint POST untuk upload pertama kali.
+    
+    The system will:
+    - Delete the old file from cloud storage
+    - Upload and process the new file
+    - Update all CV data (OCR text, summary, embedding)
+    
+    Only PDF files are allowed.
+    """
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+
+    file_data = await file.read()
+    if len(file_data) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+    try:
+        return await cv_service.update_cv(db, file_data, file.filename, current_user["id"])
+    except CVNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except CVUploadError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
+
+@router.get("/me", response_model=CandidateCVResponse)
+def get_my_cv(
+    current_user: dict = Depends(require_role(["candidate"])), 
+    db: Session = Depends(get_db)
+):
+    """
+    Get CV milik candidate yang sedang login.
+    
+    Returns 404 jika belum upload CV.
+    """
+    cv = cv_service.get_my_cv(db, current_user["id"])
+    if not cv:
+        raise HTTPException(status_code=404, detail="You haven't uploaded a CV yet")
+    return cv
+
 
 @router.get("/{cv_id}", response_model=CandidateCVResponse)
-def get_cv(cv_id: str, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    cv_record = get_cv_by_id(db, cv_id)
-    if not cv_record:
-        raise HTTPException(status_code=404, detail="CV not found")
+def get_cv(
+    cv_id: UUID, 
+    current_user: dict = Depends(require_role(["candidate", "admin", "recruiter"])), 
+    db: Session = Depends(get_db)
+):
+    """
+    Retrieve a specific CV by ID.
+    
+    - Candidates can only view their own CV.
+    - Admins and recruiters can view any CV (for matching purposes).
+    """
+    cv = cv_service.get_cv_by_id(db, cv_id)
 
-    if current_user["role"] not in ["admin", "recruiter"]:
-        if str(cv_record.candidate_id) != current_user["id"]:
-            raise HTTPException(status_code=403, detail="Access denied")
+    # Candidate hanya boleh akses CV-nya sendiri
+    if current_user["role"] == "candidate" and str(cv.candidate_id) != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
 
-    return cv_record
+    return cv
 
-@router.delete("/{cv_id}")
-def delete_cv_file(cv_id: str, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user["role"] != "candidate":
-        raise HTTPException(status_code=403, detail="Only candidates can delete their CVs")
 
-    success = delete_cv(db, cv_id, current_user["id"])
-    if not success:
-        raise HTTPException(status_code=404, detail="CV not found")
-
-    return {"message": "CV deleted successfully"}
+@router.delete("/", status_code=status.HTTP_200_OK)
+def delete_my_cv(
+    current_user: dict = Depends(require_role(["candidate"])), 
+    db: Session = Depends(get_db)
+):
+    """
+    Delete CV milik candidate yang sedang login.
+    
+    Associated file in cloud storage will also be removed.
+    After deletion, you can upload a new CV using the POST endpoint.
+    """
+    try:
+        cv_service.delete_cv(db, current_user["id"])
+        return {"message": "CV deleted successfully"}
+    except CVNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete CV: {str(e)}")
