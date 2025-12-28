@@ -5,7 +5,7 @@ from fastapi.openapi.utils import get_openapi
 import uvicorn
 import logging
 from app.core.database import Base, engine
-from app.routers import company, job, candidate, candidate_preference, candidate_cv
+from app.routers import company, job, candidate, candidate_preference, candidate_cv, job_application
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -60,6 +60,7 @@ app.include_router(job.router)
 app.include_router(candidate.router)
 app.include_router(candidate_preference.router)
 app.include_router(candidate_cv.router)
+app.include_router(job_application.router)
 
 @app.get("/")
 def read_root():

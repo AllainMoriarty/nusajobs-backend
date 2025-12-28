@@ -3,6 +3,7 @@ from app.models.company import Company
 from uuid import UUID, uuid4
 from app.services.s3_service import s3_service
 from typing import Optional, List
+from app.models.admin import Admin
 
 class CompanyService:
     def __init__(self):
@@ -19,8 +20,6 @@ class CompanyService:
                 raise Exception("Admin already has a company assigned")
 
         try:
-            db.begin()
-            
             db_company = Company(**company_data)
             db.add(db_company)
             db.flush()
@@ -55,17 +54,30 @@ class CompanyService:
             
             raise e
 
-    def get_company_by_id(self, db: Session, company_id: str) -> Optional[Company]:
-        return db.query(Company).filter(Company.id == UUID(company_id)).first()
+    def get_company_by_id(self, db: Session, company_id: UUID) -> Optional[Company]:
+        return db.query(Company).filter(Company.id == company_id).first()
+    
+    def get_company_by_admin_id(self, db: Session, current_user: dict) -> Optional[Company]:
+        if current_user["role"] != "admin":
+            raise Exception("Unauthorized: Only admin can access their company")
 
-    def update_company_from_form(self, db: Session, company_id: str, company_data: dict, file_data: bytes = None, filename: str = None, content_type: str = None, current_user: dict = None) -> Optional[Company]:
+        from app.models.admin import Admin
+        admin = db.query(Admin).filter(Admin.user_id == current_user["id"]).first()
+        if not admin:
+            return None
+
+        return db.query(Company).filter(Company.id == admin.company_id).first()
+
+    def update_company_from_form(self, db: Session, company_data: dict, file_data: bytes = None, filename: str = None, content_type: str = None, current_user: dict = None) -> Optional[Company]:
         if current_user["role"] not in ["admin"]:
-            raise Exception("Unauthorized: Only admin can create company")
+            raise Exception("Unauthorized: Only admin can update company information")
 
         try:
-            db.begin()
-            
-            db_company = db.query(Company).filter(Company.id == UUID(company_id)).first()
+            admin = db.query(Admin).filter(Admin.user_id == current_user["id"]).first()
+            if not admin:
+                raise Exception("Admin does not have a company assigned")
+
+            db_company = db.query(Company).filter(Company.id == admin.company_id).first()
             if not db_company:
                 return None
 
