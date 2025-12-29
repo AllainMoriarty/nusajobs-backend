@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.services.job_application_service import JobApplicationService
-from app.schemas.job_application import JobApplicationCreate, JobApplicationUpdate, JobApplicationResponse
+from app.schemas.job_application import JobApplicationCreate, JobApplicationUpdate, JobApplicationResponse, JobApplicationDetailResponse
 from app.core.auth_middleware import require_role
 from app.core.exceptions import JobApplicationNotFoundError, JobApplicationAlreadyExistsError, CVNotFoundError, JobApplicationPermissionError
 from uuid import UUID
@@ -62,7 +62,7 @@ def get_applications_for_job(job_id: UUID, skip: int = 0, limit: int = 10, curre
         raise HTTPException(status_code=500, detail="Failed to retrieve applications")
 
 
-@router.get("/{application_id}", response_model=JobApplicationResponse)
+@router.get("/{application_id}", response_model=JobApplicationDetailResponse)
 def get_application(application_id: UUID, current_user: dict = Depends(require_role(["candidate", "recruiter"])), db: Session = Depends(get_db)):
     """
     Retrieve a specific job application by ID.

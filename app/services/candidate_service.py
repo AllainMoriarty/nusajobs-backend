@@ -47,10 +47,8 @@ class CandidateService:
                 if value is not None:
                     setattr(db_candidate, key, value)
 
-            # Flush untuk mendapatkan ID jika belum ada
             db.flush()
 
-            # Handle image upload jika ada
             new_image_filename = None
             if file_data and filename and content_type:
                 file_ext = filename.split('.')[-1] if '.' in filename else 'jpg'
@@ -61,11 +59,10 @@ class CandidateService:
                 if not image_url:
                     raise Exception("Failed to upload image to S3")
 
-                # Hapus semua image lama dari S3 berdasarkan prefix
                 try:
                     old_files = s3_service.list_files_by_prefix(f"candidates/{db_candidate.user_id}/profile/")
                     for old_file in old_files:
-                        if old_file != new_image_filename:  # Jangan hapus file yang baru di-upload
+                        if old_file != new_image_filename:
                             s3_service.delete_file(old_file)
                 except Exception as e:
                     print(f"Warning: Failed to delete old image files: {e}")
@@ -78,8 +75,7 @@ class CandidateService:
 
         except Exception as e:
             db.rollback()
-            
-            # Hapus file baru dari S3 jika ada error
+
             if new_image_filename:
                 try:
                     s3_service.delete_file(new_image_filename)
@@ -93,7 +89,6 @@ class CandidateService:
         if not db_candidate:
             raise CandidateNotFoundError("Candidate profile not found")
 
-        # Delete semua file dari S3 berdasarkan prefix user_id
         try:
             s3_service.delete_files_by_prefix(f"candidates/{db_candidate.user_id}/")
         except Exception as e:

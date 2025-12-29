@@ -3,9 +3,10 @@ from app.models.job_application import JobApplication
 from app.models.candidate_cv import CandidateCV
 from app.models.job import Job
 from app.models.recruiter import Recruiter
+from app.models.candidate import Candidate
 from app.schemas.job_application import JobApplicationCreate, JobApplicationUpdate
 from uuid import UUID
-from app.core.exceptions import JobApplicationNotFoundError, JobApplicationAlreadyExistsError, CVNotFoundError, JobApplicationPermissionError
+from app.core.exceptions import JobApplicationNotFoundError, JobApplicationAlreadyExistsError, CVNotFoundError, JobApplicationPermissionError, CandidateNotFoundError
 
 
 class JobApplicationService:
@@ -29,13 +30,15 @@ class JobApplicationService:
         return db_application
 
     def get_application_by_id(self, db: Session, application_id: UUID, current_user: dict):
+        # Fetch the application
         app = db.query(JobApplication).filter(JobApplication.id == application_id).first()
         if not app:
             raise JobApplicationNotFoundError("Job application not found")
-        
+
+        # Authorization checks
         if current_user["role"] == "candidate" and app.candidate_id != current_user["id"]:
             raise JobApplicationPermissionError("Not authorized to view this application")
-        
+
         if current_user["role"] == "recruiter":
             job = db.query(Job).filter(Job.id == app.job_id).first()
             if not job:
@@ -44,7 +47,31 @@ class JobApplicationService:
             if not recruiter or recruiter.company_id != job.company_id:
                 raise JobApplicationPermissionError("Not authorized to view this application")
 
-        return app
+        # Fetch related data
+        candidate = db.query(Candidate).filter(Candidate.user_id == app.candidate_id).first()
+        if not candidate:
+            raise CandidateNotFoundError("Candidate profile not found")
+
+        cv = db.query(CandidateCV).filter(CandidateCV.id == app.cv_id).first()  # Fixed filter
+        if not cv:
+            raise CVNotFoundError("CV not found")
+
+        job = db.query(Job).filter(Job.id == app.job_id).first()
+        if not job:
+            raise JobApplicationNotFoundError("Associated job not found")
+
+        # Return a dictionary or object compatible with JobApplicationDetailResponse
+        return {
+            "id": app.id,
+            "job_id": app.job_id,
+            "candidate_id": app.candidate_id,
+            "cv_id": app.cv_id,
+            "status": app.status,
+            "applied_at": app.applied_at,
+            "job_data": job,
+            "candidate_data": candidate,
+            "cv_data": cv
+        }
 
     def get_my_applications(self, db: Session, candidate_id: UUID, skip: int = 0, limit: int = 10):
         return (
