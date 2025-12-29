@@ -6,9 +6,6 @@ from typing import Optional, List
 from app.models.admin import Admin
 
 class CompanyService:
-    def __init__(self):
-        self.s3_service = s3_service
-
     def create_company_from_form(self, db: Session, company_data: dict, file_data: bytes = None, filename: str = None, content_type: str = None, current_user: dict = None) -> Company:
         if current_user["role"] not in ["admin"]:
             raise Exception("Unauthorized: Only admin can create company")
@@ -24,16 +21,17 @@ class CompanyService:
             db.add(db_company)
             db.flush()
 
-            logo_uploaded = False
+            logo_filename = None
             if file_data and filename and content_type:
                 file_ext = filename.split('.')[-1] if '.' in filename else 'png'
                 logo_filename = f"companies/{db_company.id}/logo/{uuid4().hex}.{file_ext}"
 
-                logo_url = self.s3_service.upload_file(file_data, logo_filename, content_type)
+                logo_url = s3_service.upload_file(file_data, logo_filename, content_type)
 
-                if logo_url:
-                    db_company.logo_url = logo_url
-                    logo_uploaded = True
+                if not logo_url:
+                    raise Exception("Failed to upload logo to S3")
+                
+                db_company.logo_url = logo_url
 
             if current_user["role"] == "admin":
                 from app.models.admin import Admin
@@ -41,16 +39,18 @@ class CompanyService:
                 db.add(admin)
 
             db.commit()
+            db.refresh(db_company)
             return db_company
 
         except Exception as e:
             db.rollback()
             
-            if 'logo_filename' in locals() and logo_uploaded:
+            # Hapus file dari S3 jika ada error
+            if logo_filename:
                 try:
-                    self.s3_service.delete_file(logo_filename)
+                    s3_service.delete_file(logo_filename)
                 except Exception as s3_error:
-                    print(f"Error deleting uploaded logo during rollback: {s3_error}")
+                    print(f"Warning: Failed to delete logo during rollback: {s3_error}")
             
             raise e
 
@@ -81,29 +81,32 @@ class CompanyService:
             if not db_company:
                 return None
 
-            old_logo_url = db_company.logo_url
-
+            # Update data company
             for key, value in company_data.items():
                 if value is not None:
                     setattr(db_company, key, value)
 
-            new_logo_uploaded = False
+            # Handle logo upload jika ada
+            new_logo_filename = None
             if file_data and filename and content_type:
-                if db_company.logo_url:
-                    try:
-                        old_logo_key = db_company.logo_url.split('/')[-2] + '/' + db_company.logo_url.split('/')[-1]
-                        self.s3_service.delete_file(old_logo_key)
-                    except Exception as e:
-                        print(f"Error deleting old logo: {e}")
-
                 file_ext = filename.split('.')[-1] if '.' in filename else 'png'
-                logo_filename = f"companies/{db_company.id}/logo/{uuid4().hex}.{file_ext}"
+                new_logo_filename = f"companies/{db_company.id}/logo/{uuid4().hex}.{file_ext}"
 
-                logo_url = self.s3_service.upload_file(file_data, logo_filename, content_type)
+                logo_url = s3_service.upload_file(file_data, new_logo_filename, content_type)
 
-                if logo_url:
-                    db_company.logo_url = logo_url
-                    new_logo_uploaded = True
+                if not logo_url:
+                    raise Exception("Failed to upload new logo to S3")
+
+                # Hapus semua logo lama dari S3 berdasarkan prefix
+                try:
+                    old_files = s3_service.list_files_by_prefix(f"companies/{db_company.id}/logo/")
+                    for old_file in old_files:
+                        if old_file != new_logo_filename:  # Jangan hapus file yang baru di-upload
+                            s3_service.delete_file(old_file)
+                except Exception as e:
+                    print(f"Warning: Failed to delete old logo files: {e}")
+
+                db_company.logo_url = logo_url
 
             db.commit()
             db.refresh(db_company)
@@ -112,11 +115,12 @@ class CompanyService:
         except Exception as e:
             db.rollback()
             
-            if 'new_logo_uploaded' in locals() and new_logo_uploaded and 'logo_filename' in locals():
+            # Hapus file baru dari S3 jika ada error
+            if new_logo_filename:
                 try:
-                    self.s3_service.delete_file(logo_filename)
+                    s3_service.delete_file(new_logo_filename)
                 except Exception as s3_error:
-                    print(f"Error deleting uploaded logo during rollback: {s3_error}")
+                    print(f"Warning: Failed to delete logo during rollback: {s3_error}")
             
             raise e
 

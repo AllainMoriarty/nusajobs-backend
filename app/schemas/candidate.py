@@ -24,6 +24,7 @@ class CandidateResponse(BaseModel):
     birth_date: Optional[date]
     gender: Optional[str]
     location: Optional[str]
+    image_url: Optional[str]
     created_at: datetime
     updated_at: datetime
 
