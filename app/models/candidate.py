@@ -20,5 +20,6 @@ class Candidate(Base):
     location_city = Column(String)
     location_province = Column(String)
     location_country = Column(String)
+    image_url = Column(String)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())

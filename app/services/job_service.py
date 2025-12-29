@@ -24,7 +24,10 @@ class JobService:
 
         db_job = Job(
             title=job_data.title,
+            job_field=job_data.job_field,
+            job_type=job_data.job_type,
             description=job_data.description,
+            location=job_data.location,
             embedding=embedding,
             top_k=job_data.top_k,
             status=job_data.status,

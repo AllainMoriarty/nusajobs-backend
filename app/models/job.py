@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, CheckConstraint, Integer
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, ENUM
 from sqlalchemy.sql import func
 import uuid
 from app.core.database import Base
@@ -13,6 +13,9 @@ class Job(Base):
     recruiter_id = Column(UUID(as_uuid=True), ForeignKey("recruiters.user_id"))
     title = Column(String, nullable=False)
     description = Column(Text, nullable=False)
+    job_field = Column(String, nullable=False)
+    job_type = Column(String, nullable=False)
+    location = Column(String, nullable=False)
     embedding = Column(Vector(1024))
     top_k = Column(Integer, default=5)
     status = Column(
