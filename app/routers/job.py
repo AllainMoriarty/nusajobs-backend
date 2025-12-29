@@ -3,8 +3,9 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.services.job_service import JobService
 from app.schemas.job import JobCreate, JobUpdate, JobResponse
+from app.schemas.ai_screening import AIScreeningResponse
 from app.core.auth_middleware import require_role
-from app.core.exceptions import JobNotFoundError, RecruiterNotFoundError
+from app.core.exceptions import JobNotFoundError, RecruiterNotFoundError, AIScreeningNotFoundError, AIScreeningNotReadyError, AIInterviewQuestionNotFoundError
 from uuid import UUID
 
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
@@ -103,3 +104,32 @@ def list_jobs(company_id: UUID = None, skip: int = 0, limit: int = 10, db: Sessi
         return job_service.list_jobs_by_company(db, company_id, skip, limit)
     else:
         return job_service.list_all_jobs(db, skip, limit)
+    
+@router.get("/{job_id}/ai-results", response_model=AIScreeningResponse)
+def get_ai_screening_results(job_id: UUID, current_user: dict = Depends(require_role(["recruiter"])), db: Session = Depends(get_db)):
+    try:
+        return job_service.get_ai_results_by_job_id(db=db, job_id=job_id, recruiter_id=current_user["id"])
+
+    except JobNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job not found or not authorized"
+        )
+
+    except AIScreeningNotReadyError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="AI screening not available. Job is not closed yet."
+        )
+
+    except AIScreeningNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="AI screening results not found"
+        )
+
+    except AIInterviewQuestionNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="AI interview questions not found"
+        )

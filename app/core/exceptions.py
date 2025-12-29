@@ -45,3 +45,20 @@ class JobApplicationAlreadyExistsError(Exception):
 class JobApplicationPermissionError(Exception):
     """Raised when a user lacks permission to perform an action on a job application."""
     pass
+
+class AIScreeningNotFoundError(Exception):
+    """Raised when AI screening results are not found for a job."""
+    pass
+
+
+class AIInterviewQuestionNotFoundError(Exception):
+    """Raised when AI interview questions are not found for a job."""
+    pass
+
+
+class AIScreeningNotReadyError(Exception):
+    """
+    Raised when a job is not closed yet or AI screening
+    has not been generated.
+    """
+    pass
