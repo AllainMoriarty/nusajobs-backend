@@ -66,5 +66,9 @@ app.include_router(job_application.router)
 def read_root():
     return {"message": "Welcome to the Jobless API"}
 
+@app.get("/health")
+def health_check():
+    return {"status": "healthy", "message": "API is running"}
+
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
