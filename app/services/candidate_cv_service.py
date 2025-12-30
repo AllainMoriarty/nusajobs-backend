@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from app.models.candidate import Candidate
 from app.models.candidate_cv import CandidateCV
 from app.services.cv_processing_service import cv_processing_service
 from app.services.s3_service import s3_service
@@ -93,13 +94,23 @@ class CandidateCVService:
         """
         Get CV milik candidate (hanya 1 CV per candidate)
         """
-        return db.query(CandidateCV).filter(CandidateCV.candidate_id == candidate_id).first()
+        cv = db.query(CandidateCV).filter(CandidateCV.candidate_id == candidate_id).first()
+        candidate = db.query(Candidate).filter(Candidate.user_id == candidate_id).first()
+        return {
+            "candidate": candidate,
+            "candidate_cv": cv
+        }
 
     def get_cv_by_id(self, db: Session, cv_id: UUID):
         cv = db.query(CandidateCV).filter(CandidateCV.id == cv_id).first()
         if not cv:
             raise CVNotFoundError("CV not found")
-        return cv
+        
+        candidate = db.query(Candidate).filter(Candidate.user_id == candidate_id).first()
+        return {
+            "candidate": candidate,
+            "candidate_cv": cv
+        }
 
     def delete_cv(self, db: Session, candidate_id: UUID):
         """

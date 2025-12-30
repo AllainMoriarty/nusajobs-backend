@@ -1,10 +1,11 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
 from app.schemas.job import JobResponse
 from app.schemas.candidate import CandidateResponse
-from app.schemas.candidate_cv import CandidateCVResponse
+from app.schemas.candidate_cv import CandidateCVSchema, CandidateCVResponse
+from app.schemas.job import JobResponse
 
 class JobApplicationCreate(BaseModel):
     job_id: UUID
@@ -13,7 +14,7 @@ class JobApplicationCreate(BaseModel):
 class JobApplicationUpdate(BaseModel):
     status: Optional[str] = None
 
-class JobApplicationResponse(BaseModel):
+class JobApplicationSchema(BaseModel):
     id: UUID
     job_id: UUID
     candidate_id: UUID
@@ -24,16 +25,46 @@ class JobApplicationResponse(BaseModel):
     class Config:
         from_attributes = True
 
-class JobApplicationDetailResponse(BaseModel):
+class JobApplicationResponse(BaseModel):
+    job: JobResponse
+    job_application: JobApplicationSchema
+    candidate: CandidateResponse
+    candidate_cv: CandidateCVSchema
+
+    class Config:
+        from_attributes = True
+
+class MyApplicationItem(BaseModel):
+    job: JobResponse
+    job_application: JobApplicationSchema
+
+    class Config:
+        from_attributes = True
+
+class MyApplicationsResponse(BaseModel):
+    candidate: CandidateResponse
+    candidate_cv: CandidateCVSchema
+    applications: List[MyApplicationItem]
+
+    class Config:
+        from_attributes = True
+
+class JobApplicationDetail(BaseModel):
     id: UUID
     job_id: UUID
     candidate_id: UUID
     cv_id: UUID
     status: str
     applied_at: datetime
-    job_data: JobResponse
-    candidate_data: CandidateResponse
-    cv_data: CandidateCVResponse
+    candidate: CandidateResponse
+    candidate_cv: CandidateCVSchema
+
+    class Config:
+        from_attributes = True
+
+class JobApplicationByJob(BaseModel):
+    job: JobResponse
+    applications: List[JobApplicationDetail]
 
     class Config:
         from_attributes = True

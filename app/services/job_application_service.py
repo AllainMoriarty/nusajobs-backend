@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.models.job_application import JobApplication
 from app.models.candidate_cv import CandidateCV
 from app.models.job import Job
@@ -62,25 +62,52 @@ class JobApplicationService:
 
         # Return a dictionary or object compatible with JobApplicationDetailResponse
         return {
-            "id": app.id,
-            "job_id": app.job_id,
-            "candidate_id": app.candidate_id,
-            "cv_id": app.cv_id,
-            "status": app.status,
-            "applied_at": app.applied_at,
-            "job_data": job,
-            "candidate_data": candidate,
-            "cv_data": cv
+            "job": job,
+            "candidate": candidate,
+            "candidate_cv": cv,
+            "job_application": app
         }
 
     def get_my_applications(self, db: Session, candidate_id: UUID, skip: int = 0, limit: int = 10):
-        return (
-            db.query(JobApplication)
+        applications = (
+            db.query(JobApplication, Job)
+            .join(Job, Job.id == JobApplication.job_id)
             .filter(JobApplication.candidate_id == candidate_id)
             .offset(skip)
             .limit(limit)
             .all()
         )
+
+        if not applications:
+            return []
+
+        candidate = (
+            db.query(Candidate)
+            .filter(Candidate.user_id == candidate_id)
+            .first()
+        )
+        if not candidate:
+            raise CandidateNotFoundError("Candidate profile not found")
+        
+        cv = db.query(CandidateCV).filter(CandidateCV.candidate_id == candidate_id).first()
+
+        applied = []
+
+        for app, job in applications:
+            applied.append({
+                "job": job,
+                "job_application": app
+            })
+
+        results = {
+            "candidate": candidate,
+            "candidate_cv": cv,
+            "applications": applied
+
+        }
+
+        return results
+
 
     def get_applications_for_job(self, db: Session, job_id: UUID, current_user: dict, skip: int = 0, limit: int = 10):
         job = db.query(Job).filter(Job.id == job_id).first()
@@ -90,14 +117,32 @@ class JobApplicationService:
         recruiter = db.query(Recruiter).filter(Recruiter.user_id == current_user["id"]).first()
         if not recruiter or recruiter.company_id != job.company_id:
             raise JobApplicationPermissionError("Cannot see application for job outside your company")
+        
+        applications = (
+            db.query(JobApplication, Candidate, CandidateCV).join(Candidate, Candidate.user_id == JobApplication.candidate_id)
+            .join(CandidateCV, CandidateCV.candidate_id == JobApplication.candidate_id).filter(JobApplication.job_id == job_id)
+            .offset(skip).limit(limit).all())
 
-        return (
-            db.query(JobApplication)
-            .filter(JobApplication.job_id == job_id)
-            .offset(skip)
-            .limit(limit)
-            .all()
-        )
+        if not applications:
+            return []
+        
+        applicants = []
+        for app, candidate, cv in applications:
+            applicants.append({
+                "id": app.id,
+                "job_id": app.job_id,
+                "candidate_id": app.candidate_id,
+                "cv_id": app.cv_id,
+                "status": app.status,
+                "applied_at": app.applied_at,
+                "candidate": candidate,
+                "candidate_cv": cv,
+            })
+
+        return {
+            "job": job,
+            "applications": applicants
+        }
 
     def update_application_status(self, db: Session, application_id: UUID, status: str, user_id: UUID):
         app = db.query(JobApplication).filter(JobApplication.id == application_id).first()

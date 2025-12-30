@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.services.job_application_service import JobApplicationService
-from app.schemas.job_application import JobApplicationCreate, JobApplicationUpdate, JobApplicationResponse, JobApplicationDetailResponse
+from app.schemas.job_application import JobApplicationCreate, JobApplicationUpdate, JobApplicationResponse, JobApplicationSchema, JobApplicationByJob, MyApplicationsResponse
 from app.core.auth_middleware import require_role
 from app.core.exceptions import JobApplicationNotFoundError, JobApplicationAlreadyExistsError, CVNotFoundError, JobApplicationPermissionError
 from uuid import UUID
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/job-applications", tags=["Job Applications"])
 application_service = JobApplicationService()
 
 
-@router.post("/", response_model=JobApplicationResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=JobApplicationSchema, status_code=status.HTTP_201_CREATED)
 def apply_to_job(application: JobApplicationCreate, current_user: dict = Depends(require_role(["candidate"])), db: Session = Depends(get_db)):
     """
     Submit a job application using a selected CV.
@@ -31,7 +31,7 @@ def apply_to_job(application: JobApplicationCreate, current_user: dict = Depends
         raise HTTPException(status_code=500, detail="Failed to submit application")
 
 
-@router.get("/me", response_model=list[JobApplicationResponse])
+@router.get("/me", response_model=MyApplicationsResponse)
 def get_my_applications(skip: int = 0, limit: int = 10, current_user: dict = Depends(require_role(["candidate"])), db: Session = Depends(get_db)):
     """
     Retrieve all job applications submitted by the authenticated candidate.
@@ -44,7 +44,7 @@ def get_my_applications(skip: int = 0, limit: int = 10, current_user: dict = Dep
         raise HTTPException(status_code=500, detail="Failed to retrieve applications")
 
 
-@router.get("/job/{job_id}", response_model=list[JobApplicationResponse])
+@router.get("/job/{job_id}", response_model=JobApplicationByJob)
 def get_applications_for_job(job_id: UUID, skip: int = 0, limit: int = 10, current_user: dict = Depends(require_role(["recruiter"])), db: Session = Depends(get_db)):
     """
     Retrieve all applications for a specific job.
@@ -62,7 +62,7 @@ def get_applications_for_job(job_id: UUID, skip: int = 0, limit: int = 10, curre
         raise HTTPException(status_code=500, detail="Failed to retrieve applications")
 
 
-@router.get("/{application_id}", response_model=JobApplicationDetailResponse)
+@router.get("/{application_id}", response_model=JobApplicationResponse)
 def get_application(application_id: UUID, current_user: dict = Depends(require_role(["candidate", "recruiter"])), db: Session = Depends(get_db)):
     """
     Retrieve a specific job application by ID.
@@ -81,7 +81,7 @@ def get_application(application_id: UUID, current_user: dict = Depends(require_r
         raise HTTPException(status_code=500, detail="Failed to retrieve application")
 
 
-@router.patch("/{application_id}", response_model=JobApplicationResponse)
+@router.patch("/{application_id}", response_model=JobApplicationSchema)
 def update_application_status(application_id: UUID, update: JobApplicationUpdate, current_user: dict = Depends(require_role(["recruiter"])), db: Session = Depends(get_db)):
     """
     Update the status of a job application (e.g., 'shortlisted', 'rejected').

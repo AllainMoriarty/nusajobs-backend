@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from app.models.candidate import Candidate
 from app.models.candidate_preference import CandidatePreference
 from app.schemas.candidate_preference import CandidatePreferenceCreate, CandidatePreferenceUpdate
 from uuid import UUID
@@ -24,13 +25,23 @@ class CandidatePreferenceService:
         preference = db.query(CandidatePreference).filter(CandidatePreference.candidate_id == candidate_id).first()
         if not preference:
             raise CandidatePreferenceNotFoundError("Candidate preferences not found")
-        return preference
+        
+        candidate = db.query(Candidate).filter(Candidate.user_id == candidate_id).first()
+        return {
+            "candidate": candidate,
+            "candidate_preference": preference
+        }
 
     def get_candidate_preference(self, db: Session, candidate_id: UUID):
         preference = db.query(CandidatePreference).filter(CandidatePreference.candidate_id == candidate_id).first()
         if not preference:
             raise CandidatePreferenceNotFoundError("Candidate preferences not found")
-        return preference
+        
+        candidate = db.query(Candidate).filter(Candidate.user_id == candidate_id).first()
+        return {
+            "candidate": candidate,
+            "candidate_preference": preference
+        }
 
     def update_my_preference(self, db: Session, candidate_data: CandidatePreferenceUpdate, candidate_id: UUID):
         db_preference = db.query(CandidatePreference).filter(CandidatePreference.candidate_id == candidate_id).first()

@@ -3,6 +3,7 @@ from typing import List, Optional
 from datetime import datetime
 import enum
 from uuid import UUID
+from app.schemas.candidate import CandidateResponse
 
 class JobFieldEnum(str, enum.Enum):
     admin_hr = "Admin & HR"
@@ -55,14 +56,21 @@ class CandidatePreferenceUpdate(BaseModel):
     preferred_cities: Optional[List[str]] = None
     work_modes: Optional[List[WorkModeEnum]] = None
 
-class CandidatePreferenceResponse(BaseModel):
+class CandidatePreferenceSchema(BaseModel):
     candidate_id: UUID
     job_fields: List[str]
     job_types: List[str]
     preferred_cities: List[str]
     work_modes: List[str]
     created_at: datetime
-    updated_at: datetime
+    updated_at: datetime  
+
+    class Config:
+        from_attributes = True
+
+class CandidatePreferenceResponse(BaseModel):
+    candidate: CandidateResponse
+    candidate_preference: CandidatePreferenceSchema
 
     class Config:
         from_attributes = True

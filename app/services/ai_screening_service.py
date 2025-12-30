@@ -19,7 +19,7 @@ Briefly explain why this candidate matches the job.
 Job Description:
 {job_desc}
 
-Candidate CV Summary:
+Candidate CV:
 {cv_text}
 """
         res = client.chat.completions.create(

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.services.candidate_cv_service import CandidateCVService
-from app.schemas.candidate_cv import CandidateCVResponse
+from app.schemas.candidate_cv import CandidateCVSchema, CandidateCVResponse
 from app.core.auth_middleware import require_role
 from app.core.exceptions import CVNotFoundError, CVUploadError, CVDownloadError
 from uuid import UUID
@@ -11,7 +11,7 @@ router = APIRouter(prefix="/candidate-cvs", tags=["Candidate CVs"])
 cv_service = CandidateCVService()
 
 
-@router.post("/", response_model=CandidateCVResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=CandidateCVSchema, status_code=status.HTTP_201_CREATED)
 async def upload_cv(
     file: UploadFile = File(...), 
     current_user: dict = Depends(require_role(["candidate"])), 
@@ -45,7 +45,7 @@ async def upload_cv(
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 
-@router.put("/", response_model=CandidateCVResponse, status_code=status.HTTP_200_OK)
+@router.put("/", response_model=CandidateCVSchema, status_code=status.HTTP_200_OK)
 async def update_cv(
     file: UploadFile = File(...), 
     current_user: dict = Depends(require_role(["candidate"])), 

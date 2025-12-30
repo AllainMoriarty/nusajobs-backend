@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.services.candidate_preference_service import CandidatePreferenceService
-from app.schemas.candidate_preference import CandidatePreferenceCreate,CandidatePreferenceUpdate,CandidatePreferenceResponse
+from app.schemas.candidate_preference import CandidatePreferenceCreate,CandidatePreferenceUpdate, CandidatePreferenceSchema, CandidatePreferenceResponse
 from app.core.auth_middleware import require_role
 from app.core.exceptions import CandidatePreferenceNotFoundError, CandidatePreferenceAlreadyExistsError
 from uuid import UUID
@@ -11,7 +11,7 @@ router = APIRouter(prefix="/candidate-preferences", tags=["Candidate Preferences
 preference_service = CandidatePreferenceService()
 
 
-@router.post("/", response_model=CandidatePreferenceResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=CandidatePreferenceSchema, status_code=status.HTTP_201_CREATED)
 def create_preference(preference: CandidatePreferenceCreate, current_user: dict = Depends(require_role(["candidate"])), db: Session = Depends(get_db)):
     """
     Create job preferences for the authenticated candidate.
@@ -48,7 +48,7 @@ def get_my_preferences(current_user: dict = Depends(require_role(["candidate"]))
         )
 
 
-@router.put("/me", response_model=CandidatePreferenceResponse)
+@router.put("/me", response_model=CandidatePreferenceSchema)
 def update_my_preferences(preference: CandidatePreferenceUpdate, current_user: dict = Depends(require_role(["candidate"])), db: Session = Depends(get_db)):
     """
     Update the authenticated candidate's job preferences.
