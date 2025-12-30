@@ -75,10 +75,10 @@ def update_job_info(job_id: UUID, job: JobUpdate, current_user: dict = Depends(r
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Job not found or not authorized"
         )
-    except Exception:
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update job"
+            detail=f"Failed to update job: {e}"
         )
 
 

@@ -55,7 +55,7 @@ class CVProcessingService:
             img_base64 = base64.b64encode(img_data).decode('utf-8')
 
             response = await self.openai_client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-5-nano",
                 messages=[
                     {
                         "role": "user",
@@ -72,8 +72,7 @@ class CVProcessingService:
                             }
                         ]
                     }
-                ],
-                max_completion_tokens=1000
+                ]
             )
             extracted_text += response.choices[0].message.content + "\n\n"
 

@@ -20,8 +20,8 @@ ai_screening_service = AIScreeningService()
 
 class JobService:
     def create_job(self, db: Session, job_data: JobCreate, recruiter_id: UUID):
-        logger.info("user_id type:", type(recruiter_id))
-        logger.info("Sample DB user_id type:", type(db.query(Recruiter.user_id).first()))
+        logger.info("user_id type: %s", type(recruiter_id))
+        logger.info("Sample DB user_id type: %s", type(db.query(Recruiter.user_id).first()))
         recruiter = db.query(Recruiter).filter(Recruiter.user_id == recruiter_id).first()
         if not recruiter:
             raise RecruiterNotFoundError("Recruiter profile not found for this user")

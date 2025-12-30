@@ -27,7 +27,7 @@ def apply_to_job(application: JobApplicationCreate, current_user: dict = Depends
         raise HTTPException(status_code=400, detail=str(e))
     except CVNotFoundError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception:
+    except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to submit application")
 
 

@@ -7,8 +7,9 @@ from app.models.candidate_cv import CandidateCV
 from app.models.ai_screening import AIScreening
 from app.models.ai_interview_question import AIInterviewQuestion
 import json
+import re
 
-client = OpenAI(api_key=settings.OPENAI_API_KEY)
+client = OpenAI(api_key=settings.GEMINI_API_KEY, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
 
 class AIScreeningService:
     def _generate_reasoning(self, job_desc: str, cv_text: str) -> str:
@@ -23,11 +24,25 @@ Candidate CV:
 {cv_text}
 """
         res = client.chat.completions.create(
-            model="gpt-4.1-mini",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.3
+            model="gemma-3-27b-it",
+            messages=[{"role": "user", "content": prompt}]
         )
         return res.choices[0].message.content.strip()
+
+    def _safe_json_parse(self, text: str):
+            try:
+                # 1. Try direct parse
+                return json.loads(text)
+            except json.JSONDecodeError:
+                # 2. Extract content between [ ] if model added extra text
+                match = re.search(r'\[.*\]', text, re.DOTALL)
+                if match:
+                    try:
+                        return json.loads(match.group())
+                    except:
+                        pass
+                # 3. Fallback
+                return ["Tell me about your background.", "Why this role?"]
 
     def _generate_interview_questions(self, job_desc: str, cv_text: str) -> list[str]:
         prompt = f"""
@@ -41,11 +56,12 @@ Candidate CV:
 {cv_text}
 """
         res = client.chat.completions.create(
-            model="gpt-4.1-mini",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.4
+            model="gemma-3-27b-it",
+            messages=[{"role": "user", "content": prompt}]
         )
-        return json.loads(res.choices[0].message.content)
+
+        content = res.choices[0].message.content
+        return self._safe_json_parse(content)
 
     def run(self, db: Session, job: Job):
         """

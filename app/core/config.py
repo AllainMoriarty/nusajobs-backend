@@ -24,6 +24,7 @@ class Settings(BaseSettings):
 
     # OpenAI API Key
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY")
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY")
 
     class Config:
         env_file = ".env"
