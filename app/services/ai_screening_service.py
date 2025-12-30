@@ -72,7 +72,7 @@ Candidate CV:
 
         for rank, (application, cv, dist) in enumerate(results, start=1):
             score = 1 - float(dist)
-            cv_text = cv.llm_summary or (cv.ocr_text[:1500] if cv.ocr_text else "")
+            cv_text = cv.ocr_text if cv.ocr_text else ""
 
             reasoning = self._generate_reasoning(job.description, cv_text)
             questions = self._generate_interview_questions(job.description, cv_text)

@@ -13,7 +13,6 @@ class CandidateCV(Base):
 
     file_url = Column(String, nullable=False)
     ocr_text = Column(Text)
-    llm_summary = Column(Text)
-    embedding = Column(Vector(1024))
+    embedding = Column(Vector(1536))
 
     created_at = Column(DateTime, default=func.now())

@@ -90,6 +90,8 @@ class JobApplicationService:
             raise CandidateNotFoundError("Candidate profile not found")
         
         cv = db.query(CandidateCV).filter(CandidateCV.candidate_id == candidate_id).first()
+        if not cv:
+            raise CVNotFoundError("Candidate must upload CV before accessing applications")
 
         applied = []
 

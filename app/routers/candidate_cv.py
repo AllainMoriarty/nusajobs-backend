@@ -24,8 +24,7 @@ async def upload_cv(
     
     The system will:
     - Store the file in cloud storage (S3/IPFS)
-    - Extract text using OCR
-    - Generate a summary using LLM
+    - Extract text using OCR (EasyOCR for image-based PDFs)
     - Create an embedding for matching
     
     Only PDF files are allowed.
@@ -59,7 +58,7 @@ async def update_cv(
     The system will:
     - Delete the old file from cloud storage
     - Upload and process the new file
-    - Update all CV data (OCR text, summary, embedding)
+    - Update all CV data (OCR text and embedding)
     
     Only PDF files are allowed.
     """
@@ -111,7 +110,7 @@ def get_cv(
     cv = cv_service.get_cv_by_id(db, cv_id)
 
     # Candidate hanya boleh akses CV-nya sendiri
-    if current_user["role"] == "candidate" and str(cv.candidate_id) != current_user["id"]:
+    if current_user["role"] == "candidate" and str(cv["candidate_cv"].candidate_id) != current_user["id"]:
         raise HTTPException(status_code=403, detail="Access denied")
 
     return cv

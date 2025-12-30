@@ -107,9 +107,7 @@ def delete_job_endpoint(job_id: UUID, current_user: dict = Depends(require_role(
 @router.get("/", response_model=List[JobResponse])
 def list_jobs(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
     """
-    Retrieve a paginated list of jobs.
-    
-    `company_id` is provided, only jobs from that company are returned.
+    Retrieve a paginated list of all jobs.
     """
     return job_service.list_all_jobs(db, skip, limit)
     

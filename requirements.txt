@@ -24,3 +24,4 @@ PyPDF2
 python-magic
 pillow
 openai
+easyocr

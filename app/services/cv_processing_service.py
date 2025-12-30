@@ -43,7 +43,7 @@ class CVProcessingService:
         import fitz  # PyMuPDF
 
         doc = fitz.open(file_path)
-        summary = ""
+        extracted_text = ""
 
         for page_num in range(min(5, len(doc))):  # Limit to first 5 pages
             page = doc[page_num]
@@ -55,14 +55,14 @@ class CVProcessingService:
             img_base64 = base64.b64encode(img_data).decode('utf-8')
 
             response = await self.openai_client.chat.completions.create(
-                model="gpt-4.1-mini",
+                model="gpt-4o-mini",
                 messages=[
                     {
                         "role": "user",
                         "content": [
                             {
                                 "type": "text",
-                                "text": "Extract and summarize the key information from this CV image. Include name, experience, skills, education, and contact information."
+                                "text": "Extract all text from this CV image. Include name, experience, skills, education, and contact information."
                             },
                             {
                                 "type": "image_url",
@@ -75,13 +75,13 @@ class CVProcessingService:
                 ],
                 max_completion_tokens=1000
             )
-            summary += response.choices[0].message.content + "\n\n"
+            extracted_text += response.choices[0].message.content + "\n\n"
 
         doc.close()
-        return summary
+        return extracted_text
 
-    async def process_cv_file(self, file_data: bytes, filename: str) -> tuple[str, str, list]:
-        """Process CV file: extract text, get summary, generate embedding"""
+    async def process_cv_file(self, file_data: bytes, filename: str) -> tuple[str, list]:
+        """Process CV file: extract text and generate embedding"""
         # Save file temporarily
         with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
             temp_file.write(file_data)
@@ -98,24 +98,10 @@ class CVProcessingService:
                 # Extract text normally
                 ocr_text = await self.extract_text_from_pdf(temp_file_path)
 
-            # Get summary from OpenAI
-            summary_response = await self.openai_client.chat.completions.create(
-                model="gpt-4.1-mini",
-                messages=[
-                    {
-                        "role": "user",
-                        "content": f"Summarize this CV content:\n\n{ocr_text}\n\nFocus on key skills, experience, education, and qualifications."
-                    }
-                ],
-                max_completion_tokens=500
-            )
-            llm_summary = summary_response.choices[0].message.content
-            print(f"LLM Summary: {llm_summary}")
+            # Generate embedding from the OCR text
+            embedding = embedding_service.encode(ocr_text)
 
-            # Generate embedding from the summary
-            embedding = embedding_service.encode(llm_summary)
-
-            return ocr_text, llm_summary, embedding
+            return ocr_text, embedding
 
         finally:
             # Clean up temp file

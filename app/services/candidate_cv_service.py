@@ -26,8 +26,8 @@ class CandidateCVService:
             raise CVUploadError("Failed to upload file to S3")
 
         try:
-            # Process CV: OCR, LLM summary, embedding
-            ocr_text, llm_summary, embedding = await cv_processing_service.process_cv_file(file_data, filename)
+            # Process CV: OCR and embedding
+            ocr_text, embedding = await cv_processing_service.process_cv_file(file_data, filename)
         except Exception as e:
             # Hapus file dari S3 jika processing gagal
             s3_service.delete_file(s3_filename)
@@ -38,7 +38,6 @@ class CandidateCVService:
             candidate_id=candidate_id,
             file_url=file_url,
             ocr_text=ocr_text,
-            llm_summary=llm_summary,
             embedding=embedding
         )
         db.add(db_cv)
@@ -63,8 +62,8 @@ class CandidateCVService:
             raise CVUploadError("Failed to upload file to S3")
 
         try:
-            # Process CV: OCR, LLM summary, embedding
-            ocr_text, llm_summary, embedding = await cv_processing_service.process_cv_file(file_data, filename)
+            # Process CV: OCR and embedding
+            ocr_text, embedding = await cv_processing_service.process_cv_file(file_data, filename)
         except Exception as e:
             # Hapus file baru dari S3 jika processing gagal
             s3_service.delete_file(s3_filename)
@@ -83,7 +82,6 @@ class CandidateCVService:
         # Update existing record
         existing_cv.file_url = file_url
         existing_cv.ocr_text = ocr_text
-        existing_cv.llm_summary = llm_summary
         existing_cv.embedding = embedding
         
         db.commit()
@@ -106,7 +104,7 @@ class CandidateCVService:
         if not cv:
             raise CVNotFoundError("CV not found")
         
-        candidate = db.query(Candidate).filter(Candidate.user_id == candidate_id).first()
+        candidate = db.query(Candidate).filter(Candidate.user_id == cv.candidate_id).first()
         return {
             "candidate": candidate,
             "candidate_cv": cv

@@ -16,7 +16,7 @@ class Job(Base):
     job_type = Column(String, nullable=False)
     description = Column(Text, nullable=False)
     location = Column(String, nullable=False)
-    embedding = Column(Vector(1024))
+    embedding = Column(Vector(1536))
     top_k = Column(Integer, default=5)
     status = Column(
         String,

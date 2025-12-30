@@ -9,7 +9,6 @@ class CandidateCVSchema(BaseModel):
     candidate_id: UUID
     file_url: str
     ocr_text: Optional[str]
-    llm_summary: Optional[str]
     created_at: datetime
 
     class Config:
