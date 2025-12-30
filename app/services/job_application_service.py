@@ -79,7 +79,7 @@ class JobApplicationService:
         )
 
         if not applications:
-            return []
+            raise JobApplicationNotFoundError("Job Application not found")
 
         candidate = (
             db.query(Candidate)
@@ -124,7 +124,7 @@ class JobApplicationService:
             .offset(skip).limit(limit).all())
 
         if not applications:
-            return []
+            raise JobApplicationNotFoundError("Job Application not found")
         
         applicants = []
         for app, candidate, cv in applications:

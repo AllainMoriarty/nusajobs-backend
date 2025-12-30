@@ -40,6 +40,8 @@ def get_my_applications(skip: int = 0, limit: int = 10, current_user: dict = Dep
     """
     try:
         return application_service.get_my_applications(db, current_user["id"], skip, limit)
+    except JobApplicationNotFoundError as e:
+        raise HTTPException(status=404, detail=str(e))
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to retrieve applications")
 
