@@ -2,10 +2,10 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
-from app.schemas.job import JobResponse
+from app.schemas.job import JobSchema
 from app.schemas.candidate import CandidateResponse
 from app.schemas.candidate_cv import CandidateCVSchema, CandidateCVResponse
-from app.schemas.job import JobResponse
+from app.schemas.job import JobSchema
 
 class JobApplicationCreate(BaseModel):
     job_id: UUID
@@ -26,7 +26,7 @@ class JobApplicationSchema(BaseModel):
         from_attributes = True
 
 class JobApplicationResponse(BaseModel):
-    job: JobResponse
+    job: JobSchema
     job_application: JobApplicationSchema
     candidate: CandidateResponse
     candidate_cv: CandidateCVSchema
@@ -35,7 +35,7 @@ class JobApplicationResponse(BaseModel):
         from_attributes = True
 
 class MyApplicationItem(BaseModel):
-    job: JobResponse
+    job: JobSchema
     job_application: JobApplicationSchema
 
     class Config:
@@ -63,7 +63,7 @@ class JobApplicationDetail(BaseModel):
         from_attributes = True
 
 class JobApplicationByJob(BaseModel):
-    job: JobResponse
+    job: JobSchema
     applications: List[JobApplicationDetail]
 
     class Config:
