@@ -12,6 +12,7 @@ from app.services.job_application_service import JobApplicationService
 from app.models.ai_screening import AIScreening
 from app.models.ai_interview_question import AIInterviewQuestion
 from app.services.ai_screening_service import AIScreeningService
+from app.models.company import Company
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,11 @@ class JobService:
         return db_job
 
     def get_job_by_id(self, db: Session, job_id: UUID):
-        return db.query(Job).filter(Job.id == job_id).first()
+        job, company = db.query(Job, Company).join(Company, Company.id == Job.company_id).filter(Job.id == job_id).first()
+        return {
+            "job": job,
+            "company": company
+        }
 
     def update_job(self, db: Session, job_id: UUID, job_data: JobUpdate, recruiter_id: UUID):
         job = (db.query(Job).filter(Job.id == job_id, Job.recruiter_id == recruiter_id).first())
@@ -90,10 +95,26 @@ class JobService:
         return True
 
     def list_jobs_by_company(self, db: Session, company_id: UUID, skip: int = 0, limit: int = 10):
-        return db.query(Job).filter(Job.company_id == company_id).offset(skip).limit(limit).all()
+        jobs = db.query(Job).filter(Job.company_id == company_id).offset(skip).limit(limit).all()
+        company = db.query(Company).filter(Company.id == company_id).first()
+        if not jobs:
+            raise JobNotFoundError()
+        return {
+            "company": company,
+            "jobs": jobs
+        }
     
     def list_all_jobs(self, db: Session, skip: int = 0, limit: int = 10):
-        return db.query(Job).offset(skip).limit(limit).all()
+        rows = db.query(Job, Company).join(Company, Company.id == Job.company_id).offset(skip).limit(limit).all()
+
+        results = []
+        for job, company in rows:
+            results.append({
+                "job": job,
+                "company": company
+            })
+        
+        return results
     
     def get_ai_results_by_job_id(self, db: Session, job_id: UUID, recruiter_id: UUID):
         job = (db.query(Job).filter(Job.id == job_id, Job.recruiter_id == recruiter_id).first())

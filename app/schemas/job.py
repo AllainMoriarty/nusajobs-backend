@@ -1,8 +1,9 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
 import enum
+from app.schemas.company import CompanyResponse
 
 class JobFieldEnum(str, enum.Enum):
     admin_hr = "Admin & HR"
@@ -55,7 +56,7 @@ class JobUpdate(BaseModel):
     top_k: Optional[int] = None
     status: Optional[str] = None
 
-class JobResponse(BaseModel):
+class JobSchema(BaseModel):
     id: UUID
     company_id: UUID
     recruiter_id: UUID
@@ -68,6 +69,20 @@ class JobResponse(BaseModel):
     status: str
     closed_at: Optional[datetime]
     created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class JobResponse(BaseModel):
+    job: JobSchema
+    company: CompanyResponse
+
+    class Config:
+        from_attributes = True
+
+class JobByCompany(BaseModel):
+    company: CompanyResponse
+    jobs: List[JobSchema]
 
     class Config:
         from_attributes = True

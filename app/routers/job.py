@@ -2,17 +2,18 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.services.job_service import JobService
-from app.schemas.job import JobCreate, JobUpdate, JobResponse
+from app.schemas.job import JobCreate, JobUpdate, JobResponse, JobSchema, JobByCompany
 from app.schemas.ai_screening import AIScreeningResponse
 from app.core.auth_middleware import require_role
 from app.core.exceptions import JobNotFoundError, RecruiterNotFoundError, AIScreeningNotFoundError, AIScreeningNotReadyError, AIInterviewQuestionNotFoundError
 from uuid import UUID
+from typing import List
 
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
 job_service = JobService()
 
 
-@router.post("/", response_model=JobResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=JobSchema, status_code=status.HTTP_201_CREATED)
 def create_new_job(job: JobCreate, current_user: dict = Depends(require_role(["recruiter"])), db: Session = Depends(get_db)):
     """
     Create a new job posting for the authenticated recruiter's company.
@@ -30,6 +31,20 @@ def create_new_job(job: JobCreate, current_user: dict = Depends(require_role(["r
             detail="Failed to create job"
         )
 
+@router.get("/company", response_model=JobByCompany)
+def list_jobs_by_company(company_id: UUID, skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
+    """
+    Retrieve a paginated list of jobs.
+    
+    `company_id` is provided, only jobs from that company are returned.
+    """
+    try:
+        return job_service.list_jobs_by_company(db, company_id, skip, limit)
+    except JobNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job not found"
+        )
 
 @router.get("/{job_id}", response_model=JobResponse)
 def read_job(job_id: UUID, db: Session = Depends(get_db)):
@@ -45,7 +60,7 @@ def read_job(job_id: UUID, db: Session = Depends(get_db)):
     return job
 
 
-@router.put("/{job_id}", response_model=JobResponse)
+@router.put("/{job_id}", response_model=JobSchema)
 def update_job_info(job_id: UUID, job: JobUpdate, current_user: dict = Depends(require_role(["recruiter"])), db: Session = Depends(get_db)):
     """
     Update an existing job posting.
@@ -88,22 +103,15 @@ def delete_job_endpoint(job_id: UUID, current_user: dict = Depends(require_role(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete job"
         )
-
-
-@router.get("/", response_model=list[JobResponse])
-def list_jobs(company_id: UUID = None, skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
+    
+@router.get("/", response_model=List[JobResponse])
+def list_jobs(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
     """
     Retrieve a paginated list of jobs.
     
-    - If `company_id` is provided, only jobs from that company are returned.
-    - If `company_id` is omitted, all jobs across all companies are returned (public job board).
-    
-    Useful for both company-specific dashboards and public listings.
+    `company_id` is provided, only jobs from that company are returned.
     """
-    if company_id:
-        return job_service.list_jobs_by_company(db, company_id, skip, limit)
-    else:
-        return job_service.list_all_jobs(db, skip, limit)
+    return job_service.list_all_jobs(db, skip, limit)
     
 @router.get("/{job_id}/ai-results", response_model=AIScreeningResponse)
 def get_ai_screening_results(job_id: UUID, current_user: dict = Depends(require_role(["recruiter"])), db: Session = Depends(get_db)):
